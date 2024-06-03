@@ -10,7 +10,9 @@ setup(
     author="Kitsunetic",
     author_email="jh.shim.gg@gmail.com",
     url="https://github.com/Kitsunetic/space-filling-pytorch",
-    packages=find_packages(),
+    packages=find_packages(
+        include=["space_filling_pytorch", "space_filling_pytorch.*"]
+    ),
     zip_safe=False,
     install_requires=[],
     long_description=desc,
