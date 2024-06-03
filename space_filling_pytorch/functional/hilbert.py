@@ -95,7 +95,10 @@ def point_to_hilbert_distance_3d_depth16_fp32(
     y_offset: int = 1,
     z_offset: int = 2,
 ):
+    assert xyz.ndim == 3, xyz.shape
+    assert xyz.size(-1) == 3, xyz.shape
     B, N = xyz.shape[:2]
+
     distance = xyz.new_empty(B, N, dtype=th.int64)
     grid = lambda meta: (triton.cdiv(B * N, meta["BLOCK_SIZE"]),)
     point_to_hilbert_distance_3d_depth16_fp32_kernel[grid](
