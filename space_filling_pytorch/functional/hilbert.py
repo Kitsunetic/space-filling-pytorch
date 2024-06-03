@@ -36,12 +36,12 @@ def point_to_hilbert_distance_3d_depth16_fp32_kernel(
     fx = tl.load(xyz_ptr + idx_bn * 3 + x_offset, mask=mask)
     fy = tl.load(xyz_ptr + idx_bn * 3 + y_offset, mask=mask)
     fz = tl.load(xyz_ptr + idx_bn * 3 + z_offset, mask=mask)
-    x = tl.minimum(tl.maximum((fx + 1) / 2 * space_size, 0), space_size - 1)
-    y = tl.minimum(tl.maximum((fy + 1) / 2 * space_size, 0), space_size - 1)
-    z = tl.minimum(tl.maximum((fz + 1) / 2 * space_size, 0), space_size - 1)
-    x = x.to(tl.uint32)
-    y = y.to(tl.uint32)
-    z = z.to(tl.uint32)
+    x = ((fx + 1) / 2 * space_size).to(tl.uint32)
+    y = ((fy + 1) / 2 * space_size).to(tl.uint32)
+    z = ((fz + 1) / 2 * space_size).to(tl.uint32)
+    x = tl.minimum(tl.maximum(x, 0), space_size - 1)
+    y = tl.minimum(tl.maximum(y, 0), space_size - 1)
+    z = tl.minimum(tl.maximum(z, 0), space_size - 1)
 
     # calculate hilbert distance
     for i in tl.static_range(15, 0, -1):
