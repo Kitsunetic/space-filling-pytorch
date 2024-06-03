@@ -14,7 +14,10 @@ setup(
         include=["space_filling_pytorch", "space_filling_pytorch.*"]
     ),
     zip_safe=False,
-    install_requires=[],
+    install_requires=[
+        "torch",
+        "triton",
+    ],
     long_description=desc,
     long_description_content_type="text/markdown",
 )
