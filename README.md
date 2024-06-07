@@ -58,6 +58,7 @@ pip install git+https://github.com/Kitsunetic/space-filling-pytorch.git
 Currently, this library works only with 3D point cloud with float32 dtype because these are all of what I needed.
 If you need help, such as another input/output format or decoding, please contact me through [issues](https://github.com/Kitsunetic/space-filling-pytorch/issues) or email.
 
+- [ ] Performance comparison with this library to existing implementations.
 - [ ] Implement additional algorithms such as Peano, Moore, Gosper Codes.
-- [ ] Extent algorithms for more general inputs (not just 3D point cloud, but also 1D, 2D, 4D cases)
+- [ ] Extent algorithms for more general inputs (not just 3D point cloud, but also 1D, 2D, 4D cases).
 - [ ] Fusion of space filling curve code generation / ordering / gathering processes.
