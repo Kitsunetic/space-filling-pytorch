@@ -1,7 +1,7 @@
 # space-filling-pytorch
 
 A set of GPU-optimized space-filling-curve algorithms (e.g., Hilbert, Z-order) implemented in PyTorch and [OpenAI Triton](https://github.com/triton-lang/triton).
-These algorithms are more than 100 times faster than typical PyTorch-based implementations due to kernel fusion.
+These algorithms are more than 30 times faster than typical PyTorch-based implementations due to kernel fusion.
 This library is particularly useful for handling point clouds in PyTorch deep learning networks, such as [PointTransformerV3](https://github.com/Pointcept/PointTransformerV3).
 
 
@@ -58,7 +58,8 @@ pip install git+https://github.com/Kitsunetic/space-filling-pytorch.git
 Currently, this library works only with 3D point cloud with float32 dtype because these are all of what I needed.
 If you need help, such as another input/output format or decoding, please contact me through [issues](https://github.com/Kitsunetic/space-filling-pytorch/issues) or email.
 
-- [ ] Performance comparison with this library to existing implementations.
+- [x] Performance comparison with this library to existing implementations.
+- [x] Support for non-contiguous input tensors.
 - [ ] Implement additional algorithms such as Peano, Moore, Gosper Codes.
 - [ ] Extent algorithms for more general inputs (not just 3D point cloud, but also 1D, 2D, 4D cases).
-- [ ] Fusion of space filling curve code generation / ordering / gathering processes.
+- [ ] Kernel fusion of space filling curve code generation / ordering / gathering processes.
