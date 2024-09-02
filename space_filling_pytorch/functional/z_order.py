@@ -52,9 +52,9 @@ def point_to_zorder_3d_depth16_fp32_kernel(
     ret = 0
     for i in tl.static_range(0, 16):
         q = 1 << i
-        ret |= (x & q) << (2 * i + 2)
-        ret |= (y & q) << (2 * i + 1)
-        ret |= (z & q) << (2 * i + 0)
+        ret |= (x & q) << (3 * i + 2)
+        ret |= (y & q) << (3 * i + 1)
+        ret |= (z & q) << (3 * i + 0)
 
     # write results
     tl.store(distance_ptr + pid_b * N + offs_n, ret, mask=mask_n)
