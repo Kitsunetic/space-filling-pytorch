@@ -5,7 +5,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="space_filling_pytorch",
-    version="0.0.3",
+    version="0.0.4",
     description="A set of pytorch implementations for space filling curve using OpenAI Triton",
     author="Kitsunetic",
     author_email="jh.shim.gg@gmail.com",

@@ -85,9 +85,9 @@ def point_to_hilbert_distance_3d_depth16_fp32_kernel(
     iz = z.to(tl.int64)
     for i in tl.static_range(0, 16):
         q = 1 << i
-        ret |= (ix & q) << (3 * i + 2)
-        ret |= (iy & q) << (3 * i + 1)
-        ret |= (iz & q) << (3 * i + 0)
+        ret |= (ix & q) << (2 * i + 2)
+        ret |= (iy & q) << (2 * i + 1)
+        ret |= (iz & q) << (2 * i + 0)
     tl.store(distance_ptr + pid_b * N + offs_n, ret, mask=mask_n)
 
 
