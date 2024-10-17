@@ -63,13 +63,21 @@ def point_to_zorder_3d_depth16_fp32_kernel(
 def point_to_zorder_3d_depth16_fp32(
     xyz: Tensor,
     space_size: int,
-    x_offset: int = 0,
-    y_offset: int = 1,
-    z_offset: int = 2,
+    convention="xyz",
 ):
-    assert xyz.ndim == 3, xyz.shape
-    assert xyz.size(-1) == 3, xyz.shape
+    """Returns z-order code from given normalized point cloud.
+    Args:
+        xyz (Tensor): b n 3, int32. Point cloud. Must be normalize into [-1, 1].
+        space_size (int): spatial resolution. Higher for fine, lower for coarse representation.
+        convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
+    Returns:
+        distance (Tensor): b n, int64
+    """
+    assert xyz.ndim == 3 and xyz.size(-1) == 3, xyz.shape
+    convention = convention.lower()
+    assert convention in ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
     B, N = xyz.shape[:2]
+    x_offset, y_offset, z_offset = convention.find("x"), convention.find("y"), convention.find("z")
 
     distance = xyz.new_empty(B, N, dtype=th.int64)
     grid = lambda meta: (B, triton.cdiv(N, meta["BLOCK_SIZE"]))

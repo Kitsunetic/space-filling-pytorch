@@ -39,9 +39,9 @@ def point_to_hilbert_distance_3d_depth16_fp32_kernel(
     fx = tl.load(xyz_ptrs + x_offset * str_xyz_C, mask=mask_n)
     fy = tl.load(xyz_ptrs + y_offset * str_xyz_C, mask=mask_n)
     fz = tl.load(xyz_ptrs + z_offset * str_xyz_C, mask=mask_n)
-    x = ((fx + 1) / 2 * space_size).to(tl.uint32)
-    y = ((fy + 1) / 2 * space_size).to(tl.uint32)
-    z = ((fz + 1) / 2 * space_size).to(tl.uint32)
+    x = ((fx + 1) / 2 * space_size).to(tl.int64)
+    y = ((fy + 1) / 2 * space_size).to(tl.int64)
+    z = ((fz + 1) / 2 * space_size).to(tl.int64)
     x = tl.minimum(tl.maximum(x, 0), space_size - 1)
     y = tl.minimum(tl.maximum(y, 0), space_size - 1)
     z = tl.minimum(tl.maximum(z, 0), space_size - 1)
@@ -80,27 +80,32 @@ def point_to_hilbert_distance_3d_depth16_fp32_kernel(
 
     # write results
     ret = 0
-    ix = x.to(tl.int64)
-    iy = y.to(tl.int64)
-    iz = z.to(tl.int64)
     for i in tl.static_range(0, 16):
         q = 1 << i
-        ret |= (ix & q) << (2 * i + 2)
-        ret |= (iy & q) << (2 * i + 1)
-        ret |= (iz & q) << (2 * i + 0)
+        ret |= (x & q) << (2 * i + 2)
+        ret |= (y & q) << (2 * i + 1)
+        ret |= (z & q) << (2 * i + 0)
     tl.store(distance_ptr + pid_b * N + offs_n, ret, mask=mask_n)
 
 
 def point_to_hilbert_distance_3d_depth16_fp32(
     xyz: Tensor,
     space_size: int,
-    x_offset: int = 0,
-    y_offset: int = 1,
-    z_offset: int = 2,
+    convention="xyz",
 ):
-    assert xyz.ndim == 3, xyz.shape
-    assert xyz.size(-1) == 3, xyz.shape
+    """Returns z-order code from given normalized point cloud.
+    Args:
+        xyz (Tensor): b n 3, int32. Point cloud. Must be normalize into [-1, 1].
+        space_size (int): spatial resolution. Higher for fine, lower for coarse representation.
+        convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
+    Returns:
+        distance (Tensor): b n, int64
+    """
+    assert xyz.ndim == 3 and xyz.size(-1) == 3, xyz.shape
+    convention = convention.lower()
+    assert convention in ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
     B, N = xyz.shape[:2]
+    x_offset, y_offset, z_offset = convention.find("x"), convention.find("y"), convention.find("z")
 
     distance = xyz.new_empty(B, N, dtype=th.int64)
     grid = lambda meta: (B, triton.cdiv(N, meta["BLOCK_SIZE"]))
