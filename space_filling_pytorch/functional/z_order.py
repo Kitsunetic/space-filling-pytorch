@@ -65,10 +65,10 @@ def point_to_zorder_3d_depth16_fp32(
     space_size: int,
     convention="xyz",
 ):
-    """Returns z-order code from given normalized point cloud.
+    """Returns z-order code from given normalized point cloud
     Args:
-        xyz (Tensor): b n 3, int32. Point cloud. Must be normalize into [-1, 1].
-        space_size (int): spatial resolution. Higher for fine, lower for coarse representation.
+        xyz (Tensor): b n 3, int32. Point cloud. Must be normalize into [-1, 1]
+        space_size (int): spatial resolution. Higher for fine, lower for coarse representation
         convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
     Returns:
         distance (Tensor): b n, int64
