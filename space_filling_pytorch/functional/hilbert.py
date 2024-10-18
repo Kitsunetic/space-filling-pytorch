@@ -86,7 +86,7 @@ def _encode_hilbert_kernel(
     ret = _calculate_hilbert_distance(fx, fy, fz, space_size)
 
     if ASSIGN_BATCH_INDEX:
-        ret |= pid_b << 48
+        ret |= pid_b.to(tl.int64) << 48
 
     tl.store(distance_ptr + pid_b * N + offs_n, ret, mask=mask_n)
 
@@ -156,7 +156,7 @@ def _encode_hilbert_unpadded_kernel(
     ret = _calculate_hilbert_distance(fx, fy, fz, space_size)
 
     if ASSIGN_BATCH_INDEX:
-        ret |= pid << 48
+        ret |= pid.to(tl.int64) << 48
 
     tl.store(distance_ptr + offs_n, ret, mask=mask)
 
