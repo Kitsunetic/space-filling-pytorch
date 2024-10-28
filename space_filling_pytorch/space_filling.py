@@ -11,7 +11,7 @@ def encode(
     space_size: int,
     method: str,
     convention: str,
-    assign_batch_index=False,
+    assign_batch_index=True,
 ):
     """
     Args:
@@ -40,7 +40,7 @@ def encode_unpadded(
     space_size: int,
     method: str,
     convention: str,
-    assign_batch_index=False,
+    assign_batch_index=True,
 ):
     """
     Args:

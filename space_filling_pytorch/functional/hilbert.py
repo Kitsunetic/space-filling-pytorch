@@ -61,7 +61,7 @@ def _calculate_hilbert_distance(fx, fy, fz, space_size):
 @triton.jit
 def _encode_hilbert_kernel(
     xyz_ptr,
-    distance_ptr,
+    code_ptr,
     B,
     N,
     space_size,
@@ -88,20 +88,21 @@ def _encode_hilbert_kernel(
     if ASSIGN_BATCH_INDEX:
         ret |= pid_b.to(tl.int64) << 48
 
-    tl.store(distance_ptr + pid_b * N + offs_n, ret, mask=mask_n)
+    tl.store(code_ptr + pid_b * N + offs_n, ret, mask=mask_n)
 
 
 def encode_hilbert(
     xyz: Tensor,
     space_size: int,
     convention="xyz",
-    assign_batch_index=False,
+    assign_batch_index=True,
 ):
     """Returns z-order code from given normalized point cloud
     Args:
         xyz (Tensor): b n 3, float. Point cloud. Must be normalize into [-1, 1]
         space_size (int): spatial resolution. Higher for fine, lower for coarse representation
         convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
+        assign_batch_index (bool): whether to assign left 16bits for batch index
     Returns:
         distance (Tensor): b n, int64
     """
@@ -111,54 +112,48 @@ def encode_hilbert(
     B, N = xyz.shape[:2]
     x_offset, y_offset, z_offset = convention.find("x"), convention.find("y"), convention.find("z")
 
-    distance = xyz.new_empty(B, N, dtype=th.int64)
+    code = xyz.new_empty(B, N, dtype=th.int64)
     grid = lambda meta: (B, triton.cdiv(N, meta["BLK"]))
-    BLK = max(32, min(4096, triton.next_power_of_2(N)))
+    # BLK = max(32, min(2048, triton.next_power_of_2(N)))
+    BLK = 1024
     _encode_hilbert_kernel[grid](
-        xyz,
-        distance,
-        B,
-        N,
-        space_size,
-        x_offset,
-        y_offset,
-        z_offset,
-        *xyz.stride(),
-        BLK=BLK,
-        ASSIGN_BATCH_INDEX=assign_batch_index,
+        xyz, code, B, N, space_size, x_offset, y_offset, z_offset, *xyz.stride(), BLK, assign_batch_index
     )
-    return distance
+    return code
 
 
 @triton.jit
 def _encode_hilbert_unpadded_kernel(
     xyz_ptr,
     seqlen_ptr,
-    distance_ptr,
+    code_ptr,
     space_size,
     x_offset,
     y_offset,
     z_offset,
+    str_xyz_n,
+    str_xyz_c,
     BLK: tl.constexpr,
     ASSIGN_BATCH_INDEX: tl.constexpr,
 ):
-    pid = tl.program_id(0)
-    i = tl.load(seqlen_ptr + pid)
-    j = tl.load(seqlen_ptr + pid + 1)
+    pid_b = tl.program_id(0)
+    pid_n = tl.program_id(1)
+    i = tl.load(seqlen_ptr + pid_b)
+    j = tl.load(seqlen_ptr + pid_b + 1)
 
-    offs_n = i + tl.arange(0, BLK)
+    offs_n = i + pid_n * BLK + tl.arange(0, BLK)
     mask = offs_n < j
-    xyz_ptrs = xyz_ptr + offs_n * 3
+    xyz_ptrs = xyz_ptr + offs_n * str_xyz_n
 
-    fx = tl.load(xyz_ptrs + x_offset, mask=mask)
-    fy = tl.load(xyz_ptrs + y_offset, mask=mask)
-    fz = tl.load(xyz_ptrs + z_offset, mask=mask)
+    fx = tl.load(xyz_ptrs + x_offset * str_xyz_c, mask=mask)
+    fy = tl.load(xyz_ptrs + y_offset * str_xyz_c, mask=mask)
+    fz = tl.load(xyz_ptrs + z_offset * str_xyz_c, mask=mask)
     ret = _calculate_hilbert_distance(fx, fy, fz, space_size)
 
     if ASSIGN_BATCH_INDEX:
-        ret |= pid.to(tl.int64) << 48
+        ret |= pid_b.to(tl.int64) << 48
 
-    tl.store(distance_ptr + offs_n, ret, mask=mask)
+    tl.store(code_ptr + offs_n, ret, mask=mask)
 
 
 def encode_hilbert_unpadded(
@@ -167,7 +162,7 @@ def encode_hilbert_unpadded(
     max_seqlen: int,
     space_size: int,
     convention="xyz",
-    assign_batch_index=False,
+    assign_batch_index=True,
 ):
     """Returns z-order code from given normalized point cloud
     Args:
@@ -176,26 +171,22 @@ def encode_hilbert_unpadded(
         max_seqlen (int):
         space_size (int): spatial resolution. Higher for fine, lower for coarse representation
         convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
+        assign_batch_index (bool): whether to assign left 16bits for batch index
     Returns:
         distance (Tensor): N, int64
     """
-    assert xyz.is_contiguous()
     assert xyz.ndim == 2 and xyz.size(-1) == 3, xyz.shape
     convention = convention.lower()
     assert convention in ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
     B, N = len(seqlen) - 1, xyz.size(0)
     x_offset, y_offset, z_offset = convention.find("x"), convention.find("y"), convention.find("z")
+    code = xyz.new_empty(N, dtype=th.int64)
 
-    distance = xyz.new_empty(N, dtype=th.int64)
-    _encode_hilbert_unpadded_kernel[(B,)](
-        xyz,
-        seqlen,
-        distance,
-        space_size,
-        x_offset,
-        y_offset,
-        z_offset,
-        BLK=triton.next_power_of_2(max_seqlen),
-        ASSIGN_BATCH_INDEX=assign_batch_index,
+    # BLK = max(32, min(2048, triton.next_power_of_2(max_seqlen)))
+    BLK = 1024
+    grid = (B, triton.cdiv(N, BLK))
+
+    _encode_hilbert_unpadded_kernel[grid](
+        xyz, seqlen, code, space_size, x_offset, y_offset, z_offset, *xyz.stride(), BLK, assign_batch_index
     )
-    return distance
+    return code
