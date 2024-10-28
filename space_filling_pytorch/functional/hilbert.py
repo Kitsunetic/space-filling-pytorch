@@ -114,8 +114,7 @@ def encode_hilbert(
 
     code = xyz.new_empty(B, N, dtype=th.int64)
     grid = lambda meta: (B, triton.cdiv(N, meta["BLK"]))
-    # BLK = max(32, min(2048, triton.next_power_of_2(N)))
-    BLK = 1024
+    BLK = max(32, min(2048, triton.next_power_of_2(N)))
     _encode_hilbert_kernel[grid](
         xyz, code, B, N, space_size, x_offset, y_offset, z_offset, *xyz.stride(), BLK, assign_batch_index
     )
