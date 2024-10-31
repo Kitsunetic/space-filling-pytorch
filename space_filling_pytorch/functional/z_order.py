@@ -95,50 +95,47 @@ def encode_z(
 @triton.jit
 def _encode_z_unpadded_kernel(
     xyz_ptr,
-    seqlen_ptr,
-    distance_ptr,
+    batch_idx_ptr,
+    code_ptr,
     space_size,
     x_offset,
     y_offset,
     z_offset,
     str_xyz_n,
     str_xyz_c,
+    N,
     BLK: tl.constexpr,
     ASSIGN_BATCH_INDEX: tl.constexpr,
 ):
-    pid_b = tl.program_id(0)
-    pid_n = tl.program_id(1)
-    i = tl.load(seqlen_ptr + pid_b)
-    j = tl.load(seqlen_ptr + pid_b + 1)
-
-    offs_n = i + BLK * pid_n + tl.arange(0, BLK)
-    mask = offs_n < j
+    pid = tl.program_id(0)
+    offs_n = pid * BLK + tl.arange(0, BLK)
+    mask = offs_n < N
     xyz_ptrs = xyz_ptr + offs_n * str_xyz_n
     fx = tl.load(xyz_ptrs + x_offset * str_xyz_c, mask=mask)
     fy = tl.load(xyz_ptrs + y_offset * str_xyz_c, mask=mask)
     fz = tl.load(xyz_ptrs + z_offset * str_xyz_c, mask=mask)
     ret = _calculate_zorder(fx, fy, fz, space_size)
 
-    # assign batch index
     if ASSIGN_BATCH_INDEX:
-        ret |= pid_b.to(tl.int64) << 48
+        batch_idx_ptrs = batch_idx_ptr + offs_n
+        batch_idx = tl.load(batch_idx_ptrs, mask=mask).to(tl.int64)
+        ret |= batch_idx << 48
 
-    tl.store(distance_ptr + offs_n, ret, mask=mask)
+    code_ptrs = code_ptr + offs_n
+    tl.store(code_ptrs, ret, mask=mask)
 
 
 def encode_z_unpadeded(
     xyz: Tensor,
-    seqlen: Tensor,
-    max_seqlen: int,
+    batch_idx: Tensor,
     space_size: int,
     convention="xyz",
     assign_batch_index=True,
 ) -> Tensor:
     """Returns z-order code from given normalized point cloud.
     Args:
-        xyz (Tensor): b n 3, float. Point cloud. Must be normalize into [-1, 1]
-        seqlen (Tensor): b+1, int32
-        max_seqlen (int):
+        xyz (Tensor): N 3, float. Point cloud. Must be normalize into [-1, 1]
+        batch_idx (Tensor): N, int(32 or 64).
         space_size (int): spatial resolution. Higher for fine, lower for coarse representation
         convention (str): xyz offset. Must be one of ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
         assign_batch_index (bool): whether to assign left 16bits for batch index
@@ -148,15 +145,15 @@ def encode_z_unpadeded(
     assert xyz.ndim == 2 and xyz.size(-1) == 3, xyz.shape
     convention = convention.lower()
     assert convention in ["xyz", "xzy", "yxz", "yzx", "zxy", "zyx"]
-    B, N = len(seqlen) - 1, xyz.size(0)
     x_offset, y_offset, z_offset = convention.find("x"), convention.find("y"), convention.find("z")
-    distance = xyz.new_empty(N, dtype=th.int64)
 
-    # BLK = max(32, min(2048, triton.next_power_of_2(max_seqlen)))
-    BLK = 1024
-    grid = (B, triton.cdiv(N, BLK))
+    N = len(xyz)
+    code = xyz.new_empty(N, dtype=th.int64)
+
+    BLK = max(32, min(2048, triton.next_power_of_2(N)))
+    grid = (triton.cdiv(N, BLK),)
 
     _encode_z_unpadded_kernel[grid](
-        xyz, seqlen, distance, space_size, x_offset, y_offset, z_offset, *xyz.stride(), BLK, assign_batch_index
+        xyz, batch_idx, code, space_size, x_offset, y_offset, z_offset, *xyz.stride(), N, BLK, assign_batch_index
     )
-    return distance
+    return code
